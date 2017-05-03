@@ -160,6 +160,55 @@ TEST(FlowableTest, SimpleTake) {
   EXPECT_EQ(std::size_t{0}, Refcounted::objects());
 }
 
+TEST(FlowableTest, CycleOne) {
+  ASSERT_EQ(std::size_t{0}, Refcounted::objects());
+  std::string payload = "Payload";
+  EXPECT_EQ(
+    run(Flowables::cycle(payload)
+      ->take(5)),
+    std::vector<std::string>({"Payload", "Payload", "Payload",
+      "Payload", "Payload"}));
+  EXPECT_EQ(std::size_t{0}, Refcounted::objects());
+
+  // map should not modify future payloads
+  int i = 1;
+  auto flowable = Flowables::cycle(payload)
+    ->map([&i](std::string s) { return s + " " + std::to_string(i++); })
+    ->take(5);
+  EXPECT_EQ(
+    run(std::move(flowable)),
+    std::vector<std::string>({"Payload 1", "Payload 2", "Payload 3",
+      "Payload 4", "Payload 5"}));
+
+  flowable.reset();
+  EXPECT_EQ(std::size_t{0}, Refcounted::objects());
+}
+
+TEST(FlowableTest, CycleList) {
+  ASSERT_EQ(std::size_t{0}, Refcounted::objects());
+  EXPECT_EQ(
+    run(Flowables::cycle({std::string("Payload 1"), std::string("Payload 2")})
+      ->take(5)),
+    std::vector<std::string>({"Payload 1", "Payload 2", "Payload 1",
+      "Payload 2", "Payload 1"}));
+
+  EXPECT_EQ(std::size_t{0}, Refcounted::objects());
+
+  // map should not modify future payloads
+  int i = 1;
+  auto flowable = Flowables::cycle(
+      {std::string("Payload 1"), std::string("Payload 2")})
+    ->map([&i](std::string s) { return s + " " + std::to_string(i++); })
+    ->take(5);
+  EXPECT_EQ(
+    run(std::move(flowable)),
+    std::vector<std::string>({"Payload 1 1", "Payload 2 2", "Payload 1 3",
+      "Payload 2 4", "Payload 1 5"}));
+
+  flowable.reset();
+  EXPECT_EQ(std::size_t{0}, Refcounted::objects());
+}
+
 TEST(FlowableTest, FlowableError) {
   auto flowable = Flowables::error<int>(std::runtime_error("something broke!"));
   auto collector =

@@ -66,6 +66,38 @@ class Flowables {
     return Flowable<T>::create(std::move(lambda));
   }
 
+  template <typename T>
+  static Reference<Flowable<T>> cycle(const T& value) {
+    auto lambda = [value](Subscriber<T>& subscriber, int64_t requested) {
+      int64_t emitted = 0;
+      while (emitted < requested) {
+        subscriber.onNext(value);
+        ++emitted;
+      }
+      return std::make_tuple(emitted, false);
+    };
+
+    return Flowable<T>::create(std::move(lambda));
+  }
+
+  template <typename T>
+  static Reference<Flowable<T>> cycle(std::initializer_list<T> list) {
+    auto lambda = [ list, it = list.begin() ](
+        Subscriber<T> & subscriber, int64_t requested) mutable {
+      int64_t emitted = 0;
+      while (emitted < requested) {
+        subscriber.onNext(*it++);
+        ++emitted;
+        if (it == list.end()) {
+          it = list.begin();
+        }
+      }
+
+      return std::make_tuple(emitted, false);
+    };
+    return Flowable<T>::create(std::move(lambda));
+  }
+
   template <
       typename T,
       typename OnSubscribe,
